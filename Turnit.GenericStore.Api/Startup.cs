@@ -24,6 +24,11 @@ namespace Turnit.GenericStore.Api
         public void ConfigureServices(IServiceCollection services)
         {
             services.AddControllers();
+            services.AddAutoMapper(typeof(Startup));
+            services.AddMediatR(conf =>
+            {
+                conf.RegisterServicesFromAssemblyContaining(typeof(Startup));
+            });
 
             services.AddScoped(CreateSessionFactory);
             services.AddScoped<ISession>(sp => sp.GetRequiredService<ISessionFactory>().OpenSession());

@@ -1,34 +1,25 @@
-using System.Linq;
-using System.Threading.Tasks;
+using MediatR;
 using Microsoft.AspNetCore.Mvc;
-using NHibernate;
-using Turnit.GenericStore.Api.Entities;
+using System.Threading.Tasks;
+using Turnit.GenericStore.Api.Models;
+using Turnit.GenericStore.Api.Models.Requests;
 
 namespace Turnit.GenericStore.Api.Features.Sales;
 
 [Route("categories")]
 public class CategoriesController : ApiControllerBase
 {
-    private readonly ISession _session;
+    private readonly IMediator _mediator;
 
-    public CategoriesController(ISession session)
+    public CategoriesController(IMediator mediator)
     {
-        _session = session;
+        _mediator = mediator;
     }
-    
+
     [HttpGet, Route("")]
     public async Task<CategoryModel[]> AllCategories()
     {
-        var categories = await _session.QueryOver<Category>().ListAsync();
-
-        var result = categories
-            .Select(x => new CategoryModel
-            {
-                Id = x.Id,
-                Name = x.Name
-            })
-            .ToArray();
-        
-        return result;
+        var request = new GetAllCategoriesRequest();
+        return await _mediator.Send(request);
     }
 }

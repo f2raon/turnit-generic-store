@@ -1,6 +1,6 @@
 using System;
 
-namespace Turnit.GenericStore.Api.Features.Sales;
+namespace Turnit.GenericStore.Api.Models;
 
 public class CategoryModel
 {

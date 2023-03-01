@@ -1,103 +1,55 @@
+using MediatR;
+using Microsoft.AspNetCore.Mvc;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc;
-using NHibernate;
-using Turnit.GenericStore.Api.Entities;
+using Turnit.GenericStore.Api.Models;
+using Turnit.GenericStore.Api.Models.Requests;
 
 namespace Turnit.GenericStore.Api.Features.Sales;
 
 [Route("products")]
 public class ProductsController : ApiControllerBase
 {
-    private readonly ISession _session;
+    private readonly IMediator _mediator;
 
-    public ProductsController(ISession session)
+    public ProductsController(IMediator mediator)
     {
-        _session = session;
+        _mediator = mediator;
     }
-    
+
     [HttpGet, Route("by-category/{categoryId:guid}")]
-    public async Task<ProductModel[]> ProductsByCategory(Guid categoryId)
+    public async Task<ProductCategoryModel> ProductsByCategory(Guid categoryId)
     {
-        var products = await _session.QueryOver<ProductCategory>()
-            .Where(x => x.Category.Id == categoryId)
-            .Select(x => x.Product)
-            .ListAsync<Product>();
-
-        var result = new List<ProductModel>();
-
-        foreach (var product in products)
-        {
-            var availability = await _session.QueryOver<ProductAvailability>()
-                .Where(x => x.Product.Id == product.Id)
-                .ListAsync();
-            
-            var model = new ProductModel
-            {
-                Id = product.Id,
-                Name = product.Name,
-                Availability = availability.Select(x => new ProductModel.AvailabilityModel
-                {
-                    StoreId = x.Store.Id,
-                    Availability = x.Availability
-                }).ToArray()
-            };
-            result.Add(model);
-        }
-        
-        return result.ToArray();
+        var request = new GetProductsByCategoryRequest(categoryId);
+        return await _mediator.Send(request);
     }
-    
+
     [HttpGet, Route("")]
     public async Task<ProductCategoryModel[]> AllProducts()
     {
-        var products = await _session.QueryOver<Product>().ListAsync<Product>();
-        var productCategories = await _session.QueryOver<ProductCategory>().ListAsync();
+        var request = new GetAllProductsRequest();
+        return await _mediator.Send(request);
+    }
 
-        var productModels = new List<ProductModel>();
-        foreach (var product in products)
-        {
-            var availability = await _session.QueryOver<ProductAvailability>()
-                .Where(x => x.Product.Id == product.Id)
-                .ListAsync();
-            
-            var model = new ProductModel
-            {
-                Id = product.Id,
-                Name = product.Name,
-                Availability = availability.Select(x => new ProductModel.AvailabilityModel
-                {
-                    StoreId = x.Store.Id,
-                    Availability = x.Availability
-                }).ToArray()
-            };
-            productModels.Add(model);
-        }
-        
-        var result = new List<ProductCategoryModel>();
-        foreach (var category in productCategories.GroupBy(x => x.Category.Id))
-        {
-            var productIds = category.Select(x => x.Product.Id).ToHashSet();
-            result.Add(new ProductCategoryModel
-            {
-                CategoryId = category.Key,
-                Products = productModels
-                    .Where(x => productIds.Contains(x.Id))
-                    .ToArray()
-            });
-        }
+    [HttpPut, Route("{productId:guid}/category/{categoryId:guid}")]
+    public async Task AddNewProductToCategory(Guid productId, Guid categoryId)
+    {
+        var request = new AddNewProductRequest(productId, categoryId);
+        await _mediator.Send(request);
+    }
 
-        var uncategorizedProducts = productModels.Except(result.SelectMany(x => x.Products));
-        if (uncategorizedProducts.Any())
-        {
-            result.Add(new ProductCategoryModel
-            {
-                Products = uncategorizedProducts.ToArray()
-            });
-        }
-        
-        return result.ToArray();
+    [HttpDelete, Route("{productId:guid}/category/{categoryId:guid}")]
+    public async Task RemoveProductFromCategory(Guid productId, Guid categoryId)
+    {
+        var request = new DeleteProductRequest(productId, categoryId);
+        await _mediator.Send(request);
+    }
+
+    [HttpPost, Route("{productId:guid}/book")]
+    public async Task BookProduct(Guid productId, [FromBody] Dictionary<Guid, int> items)
+    {
+        var request = new BookProductRequest(productId, items);
+        await _mediator.Send(request);
     }
 }
