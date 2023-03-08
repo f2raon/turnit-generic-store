@@ -19,25 +19,27 @@ namespace Turnit.GenericStore.Api.Handlers
 
         public async Task Handle(BookProductRequest request, CancellationToken cancellationToken)
         {
-            foreach (var item in request.Items)
+            using (var transaction = _session.BeginTransaction())
             {
-                var productAvailability = await _session.QueryOver<ProductAvailability>()
-                    .Where(e => e.Store.Id == item.Key)
-                    .And(e => e.Product.Id == request.ProductId)
-                    .SingleOrDefaultAsync(cancellationToken)
-                    ?? throw new Exception("Store does not exists.");
-
-                if (productAvailability.Availability < item.Value)
+                foreach (var item in request.Items)
                 {
-                    throw new Exception("Requested quantity is more than left in the stock.");
-                }
+                    var productAvailability = await _session.QueryOver<ProductAvailability>()
+                        .Where(e => e.Store.Id == item.Key)
+                        .And(e => e.Product.Id == request.ProductId)
+                        .SingleOrDefaultAsync(cancellationToken)
+                        ?? throw new Exception("Store does not exists.");
 
-                productAvailability.Availability -= item.Value;
-                using (var transaction = _session.BeginTransaction())
-                {
+                    if (productAvailability.Availability < item.Value)
+                    {
+                        throw new Exception("Requested quantity is more than left in the stock.");
+                    }
+
+                    productAvailability.Availability -= item.Value;
+
                     await _session.UpdateAsync(productAvailability, cancellationToken);
-                    await transaction.CommitAsync(cancellationToken);
                 }
+
+                await transaction.CommitAsync(cancellationToken);
             }
         }
     }
